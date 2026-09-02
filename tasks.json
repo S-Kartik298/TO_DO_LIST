@@ -1,3 +1,18 @@
 [
-    "Complete  homework"
+    {
+        "task": "Complete  homework",
+        "completed": true
+    },
+    {
+        "task": "study maths",
+        "completed": true
+    },
+    {
+        "task": "write record",
+        "completed": false
+    },
+    {
+        "task": "plan for a small trip",
+        "completed": false
+    }
 ]
