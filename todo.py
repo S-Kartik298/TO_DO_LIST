@@ -1,48 +1,57 @@
-import tkinter
+import tkinter as tk
 from tkinter import messagebox
 import json
 
 
-# ==================================================
-# FILE NAME
-# ==================================================
+# ==========================================
+# FILE WHERE TASKS ARE STORED
+# ==========================================
 
 FILE_NAME = "tasks.json"
 
 
-# ==================================================
+# ==========================================
 # MAIN WINDOW
-# ==================================================
+# ==========================================
 
-window = tkinter.Tk()
+window = tk.Tk()
 
 window.title("My To-Do List")
-window.geometry("650x750")
+window.geometry("700x750")
+
+window.resizable(False, False)
 
 
-# ==================================================
-# TASK DATA
-# ==================================================
+# ==========================================
+# TASK LIST
+# ==========================================
 
 tasks = []
 
 
-# ==================================================
-# SAVE TASKS TO JSON
-# ==================================================
+# ==========================================
+# SAVE TASKS
+# ==========================================
 
 def save_tasks():
 
-    file = open(FILE_NAME, "w")
+    try:
 
-    json.dump(tasks, file, indent=4)
+        with open(FILE_NAME, "w") as file:
 
-    file.close()
+            json.dump(tasks, file, indent=4)
+
+    except Exception as error:
+
+        messagebox.showerror(
+            "Error",
+            "Could not save tasks.\n" + str(error)
+        )
 
 
-# ==================================================
-# LOAD TASKS FROM JSON
-# ==================================================
+# ==========================================
+# LOAD TASKS
+# ==========================================
 
 def load_tasks():
 
@@ -50,64 +59,233 @@ def load_tasks():
 
     try:
 
-        file = open(FILE_NAME, "r")
+        with open(FILE_NAME, "r") as file:
 
-        tasks = json.load(file)
+            data = json.load(file)
 
-        file.close()
 
-    except FileNotFoundError:
+        # Make sure the JSON contains a list
+        if not isinstance(data, list):
+
+            tasks = []
+
+            return
+
 
         tasks = []
 
-    refresh_list()
+
+        # Read every item
+        for item in data:
+
+            # --------------------------------
+            # NEW FORMAT
+            # --------------------------------
+
+            if isinstance(item, dict):
+
+                task = {
+
+                    "task": str(
+                        item.get("task", "")
+                    ),
+
+                    "completed": bool(
+                        item.get("completed", False)
+                    ),
+
+                    "priority": str(
+                        item.get("priority", "Medium")
+                    ),
+
+                    "due_date": str(
+                        item.get("due_date", "")
+                    ),
+
+                    "category": str(
+                        item.get("category", "College")
+                    )
+
+                }
 
 
-# ==================================================
+                # Make sure priority is valid
+
+                if task["priority"] not in [
+                    "High",
+                    "Medium",
+                    "Low"
+                ]:
+
+                    task["priority"] = "Medium"
+
+
+                # Make sure category is valid
+
+                if task["category"] not in [
+                    "College",
+                    "Personal",
+                    "Work",
+                    "Other"
+                ]:
+
+                    task["category"] = "Other"
+
+
+                tasks.append(task)
+
+
+            # --------------------------------
+            # OLD FORMAT
+            # --------------------------------
+
+            elif isinstance(item, str):
+
+                task_text = item
+
+                completed = False
+
+
+                # Old completed task
+
+                if task_text.startswith("✓ "):
+
+                    completed = True
+
+                    task_text = task_text[2:]
+
+
+                # Remove old numbering
+
+                if ". " in task_text:
+
+                    first_part = task_text.split(
+                        ". ",
+                        1
+                    )
+
+                    if first_part[0].isdigit():
+
+                        task_text = first_part[1]
+
+
+                task = {
+
+                    "task": task_text,
+
+                    "completed": completed,
+
+                    "priority": "Medium",
+
+                    "due_date": "",
+
+                    "category": "College"
+
+                }
+
+
+                tasks.append(task)
+
+
+    except FileNotFoundError:
+
+        # First time running the program
+        tasks = []
+
+
+    except json.JSONDecodeError:
+
+        # If JSON file is damaged
+        tasks = []
+
+
+    except Exception as error:
+
+        messagebox.showerror(
+            "Error",
+            "Could not load tasks.\n" + str(error)
+        )
+
+        tasks = []
+
+
+# ==========================================
 # DISPLAY TASKS
-# ==================================================
+# ==========================================
 
-def refresh_list():
+def refresh_tasks():
 
-    task_list.delete(0, tkinter.END)
+    task_list.delete(
+        0,
+        tk.END
+    )
+
 
     search_text = search_entry.get().lower()
 
+
+    visible_tasks.clear()
+
+
     number = 1
+
 
     for task in tasks:
 
-        # Search task
+        # Search
         if search_text in task["task"].lower():
 
-            status = ""
+            visible_tasks.append(task)
+
+
+            # Completion symbol
 
             if task["completed"]:
+
                 status = "✓ "
 
-            text = (
+            else:
+
+                status = ""
+
+
+            # Display text
+
+            display_text = (
+
                 str(number)
                 + ". "
                 + status
                 + task["task"]
-                + " | Priority: "
+                + " | "
                 + task["priority"]
                 + " | Due: "
-                + task["due_date"]
+                + (
+                    task["due_date"]
+                    if task["due_date"]
+                    else "No date"
+                )
                 + " | "
                 + task["category"]
+
             )
 
-            task_list.insert(tkinter.END, text)
 
-            number = number + 1
+            task_list.insert(
+                tk.END,
+                display_text
+            )
 
-    update_counter()
+
+            number += 1
 
 
-# ==================================================
+    update_progress()
+
+
+# ==========================================
 # ADD TASK
-# ==================================================
+# ==========================================
 
 def add_task():
 
@@ -120,6 +298,8 @@ def add_task():
     category = category_var.get()
 
 
+    # Check empty task
+
     if task_name == "":
 
         messagebox.showwarning(
@@ -129,6 +309,8 @@ def add_task():
 
         return
 
+
+    # Create task
 
     new_task = {
 
@@ -145,24 +327,42 @@ def add_task():
     }
 
 
+    # Add to list
+
     tasks.append(new_task)
+
+
+    # Save
 
     save_tasks()
 
-    task_entry.delete(0, tkinter.END)
 
-    date_entry.delete(0, tkinter.END)
+    # Clear input boxes
 
-    refresh_list()
+    task_entry.delete(
+        0,
+        tk.END
+    )
+
+    date_entry.delete(
+        0,
+        tk.END
+    )
 
 
-# ==================================================
+    # Refresh display
+
+    refresh_tasks()
+
+
+# ==========================================
 # GET SELECTED TASK
-# ==================================================
+# ==========================================
 
 def get_selected_task():
 
     selected = task_list.curselection()
+
 
     if not selected:
 
@@ -174,103 +374,126 @@ def get_selected_task():
         return None
 
 
-    search_text = search_entry.get().lower()
-
-    visible_tasks = []
+    position = selected[0]
 
 
-    for task in tasks:
+    if position >= len(visible_tasks):
 
-        if search_text in task["task"].lower():
-
-            visible_tasks.append(task)
+        return None
 
 
-    return visible_tasks[selected[0]]
+    return visible_tasks[position]
 
 
-# ==================================================
+# ==========================================
 # COMPLETE TASK
-# ==================================================
+# ==========================================
 
 def complete_task():
 
     task = get_selected_task()
 
+
     if task is not None:
 
-        task["completed"] = True
+        task["completed"] = not task["completed"]
+
 
         save_tasks()
 
-        refresh_list()
+        refresh_tasks()
 
 
-# ==================================================
+# ==========================================
 # DELETE TASK
-# ==================================================
+# ==========================================
 
 def delete_task():
 
     task = get_selected_task()
 
+
     if task is not None:
 
-        tasks.remove(task)
+        answer = messagebox.askyesno(
 
-        save_tasks()
+            "Delete Task",
 
-        refresh_list()
+            "Are you sure you want to delete this task?"
+
+        )
 
 
-# ==================================================
+        if answer:
+
+            tasks.remove(task)
+
+            save_tasks()
+
+            refresh_tasks()
+
+
+# ==========================================
 # EDIT TASK
-# ==================================================
+# ==========================================
 
 def edit_task():
 
     task = get_selected_task()
 
-    if task is not None:
 
-        task_entry.delete(0, tkinter.END)
+    if task is None:
 
-        task_entry.insert(
-            0,
-            task["task"]
-        )
+        return
 
 
-        date_entry.delete(0, tkinter.END)
+    # Put existing information into input boxes
 
-        date_entry.insert(
-            0,
-            task["due_date"]
-        )
+    task_entry.delete(
+        0,
+        tk.END
+    )
 
-
-        priority_var.set(
-            task["priority"]
-        )
-
-
-        category_var.set(
-            task["category"]
-        )
+    task_entry.insert(
+        0,
+        task["task"]
+    )
 
 
-        # Remove old task
+    date_entry.delete(
+        0,
+        tk.END
+    )
 
-        tasks.remove(task)
+    date_entry.insert(
+        0,
+        task["due_date"]
+    )
 
-        save_tasks()
 
-        refresh_list()
+    priority_var.set(
+        task["priority"]
+    )
 
 
-# ==================================================
-# CLEAR ALL
-# ==================================================
+    category_var.set(
+        task["category"]
+    )
+
+
+    # Remove old task
+
+    tasks.remove(task)
+
+
+    save_tasks()
+
+    refresh_tasks()
+
+
+# ==========================================
+# CLEAR ALL TASKS
+# ==========================================
 
 def clear_all():
 
@@ -280,8 +503,11 @@ def clear_all():
 
 
     answer = messagebox.askyesno(
+
         "Clear All",
+
         "Are you sure you want to delete all tasks?"
+
     )
 
 
@@ -291,14 +517,14 @@ def clear_all():
 
         save_tasks()
 
-        refresh_list()
+        refresh_tasks()
 
 
-# ==================================================
+# ==========================================
 # UPDATE PROGRESS
-# ==================================================
+# ==========================================
 
-def update_counter():
+def update_progress():
 
     total = len(tasks)
 
@@ -309,10 +535,10 @@ def update_counter():
 
         if task["completed"]:
 
-            completed = completed + 1
+            completed += 1
 
 
-    counter_label.config(
+    progress_label.config(
 
         text="Progress: "
         + str(completed)
@@ -323,48 +549,68 @@ def update_counter():
     )
 
 
-# ==================================================
+# ==========================================
 # SEARCH TASKS
-# ==================================================
+# ==========================================
 
 def search_tasks():
 
-    refresh_list()
+    refresh_tasks()
 
 
-# ==================================================
+# ==========================================
 # CLEAR SEARCH
-# ==================================================
+# ==========================================
 
 def clear_search():
 
-    search_entry.delete(0, tkinter.END)
+    search_entry.delete(
+        0,
+        tk.END
+    )
 
-    refresh_list()
+    refresh_tasks()
 
 
-# ==================================================
+# ==========================================
+# SAVE BEFORE CLOSING
+# ==========================================
+
+def close_application():
+
+    save_tasks()
+
+    window.destroy()
+
+
+# ==========================================
 # HEADING
-# ==================================================
+# ==========================================
 
-heading = tkinter.Label(
+heading = tk.Label(
 
     window,
 
     text="MY TO-DO LIST",
 
-    font=("Arial", 24, "bold")
+    font=(
+        "Arial",
+        24,
+        "bold"
+    )
 
 )
 
-heading.pack(pady=15)
+heading.pack(
+    pady=15
+)
 
 
-# ==================================================
-# TASK ENTRY
-# ==================================================
+# ==========================================
+# TASK INPUT
+# ==========================================
 
-instruction = tkinter.Label(
+task_label = tk.Label(
 
     window,
 
@@ -372,25 +618,27 @@ instruction = tkinter.Label(
 
 )
 
-instruction.pack()
+task_label.pack()
 
 
-task_entry = tkinter.Entry(
+task_entry = tk.Entry(
 
     window,
 
-    width=50
+    width=55
 
 )
 
-task_entry.pack(pady=5)
+task_entry.pack(
+    pady=5
+)
 
 
-# ==================================================
+# ==========================================
 # PRIORITY
-# ==================================================
+# ==========================================
 
-priority_label = tkinter.Label(
+priority_label = tk.Label(
 
     window,
 
@@ -401,12 +649,14 @@ priority_label = tkinter.Label(
 priority_label.pack()
 
 
-priority_var = tkinter.StringVar()
+priority_var = tk.StringVar()
 
-priority_var.set("Medium")
+priority_var.set(
+    "Medium"
+)
 
 
-priority_menu = tkinter.OptionMenu(
+priority_menu = tk.OptionMenu(
 
     window,
 
@@ -418,14 +668,16 @@ priority_menu = tkinter.OptionMenu(
 
 )
 
-priority_menu.pack(pady=5)
+priority_menu.pack(
+    pady=3
+)
 
 
-# ==================================================
+# ==========================================
 # DUE DATE
-# ==================================================
+# ==========================================
 
-date_label = tkinter.Label(
+date_label = tk.Label(
 
     window,
 
@@ -436,7 +688,7 @@ date_label = tkinter.Label(
 date_label.pack()
 
 
-date_entry = tkinter.Entry(
+date_entry = tk.Entry(
 
     window,
 
@@ -444,14 +696,16 @@ date_entry = tkinter.Entry(
 
 )
 
-date_entry.pack(pady=5)
+date_entry.pack(
+    pady=3
+)
 
 
-# ==================================================
+# ==========================================
 # CATEGORY
-# ==================================================
+# ==========================================
 
-category_label = tkinter.Label(
+category_label = tk.Label(
 
     window,
 
@@ -462,12 +716,14 @@ category_label = tkinter.Label(
 category_label.pack()
 
 
-category_var = tkinter.StringVar()
+category_var = tk.StringVar()
 
-category_var.set("College")
+category_var.set(
+    "College"
+)
 
 
-category_menu = tkinter.OptionMenu(
+category_menu = tk.OptionMenu(
 
     window,
 
@@ -480,33 +736,37 @@ category_menu = tkinter.OptionMenu(
 
 )
 
-category_menu.pack(pady=5)
+category_menu.pack(
+    pady=3
+)
 
 
-# ==================================================
+# ==========================================
 # ADD BUTTON
-# ==================================================
+# ==========================================
 
-add_button = tkinter.Button(
+add_button = tk.Button(
 
     window,
 
     text="ADD TASK",
 
-    width=20,
+    width=25,
 
     command=add_task
 
 )
 
-add_button.pack(pady=8)
+add_button.pack(
+    pady=8
+)
 
 
-# ==================================================
+# ==========================================
 # SEARCH
-# ==================================================
+# ==========================================
 
-search_label = tkinter.Label(
+search_label = tk.Label(
 
     window,
 
@@ -514,21 +774,23 @@ search_label = tkinter.Label(
 
 )
 
-search_label.pack(pady=5)
+search_label.pack()
 
 
-search_entry = tkinter.Entry(
+search_entry = tk.Entry(
 
     window,
 
-    width=40
+    width=45
 
 )
 
-search_entry.pack()
+search_entry.pack(
+    pady=3
+)
 
 
-search_button = tkinter.Button(
+search_button = tk.Button(
 
     window,
 
@@ -540,10 +802,12 @@ search_button = tkinter.Button(
 
 )
 
-search_button.pack(pady=5)
+search_button.pack(
+    pady=3
+)
 
 
-clear_search_button = tkinter.Button(
+clear_search_button = tk.Button(
 
     window,
 
@@ -555,38 +819,57 @@ clear_search_button = tkinter.Button(
 
 )
 
-clear_search_button.pack(pady=3)
+clear_search_button.pack(
+    pady=3
+)
 
 
-# ==================================================
+# ==========================================
 # TASK LIST
-# ==================================================
+# ==========================================
 
-task_list = tkinter.Listbox(
+task_list = tk.Listbox(
 
     window,
 
-    width=85,
+    width=90,
 
-    height=12
+    height=12,
+
+    font=(
+        "Arial",
+        10
+    )
 
 )
 
-task_list.pack(pady=15)
+task_list.pack(
+    pady=12
+)
 
 
-# ==================================================
+# This stores the tasks currently visible
+# after searching
+
+visible_tasks = []
+
+
+# ==========================================
 # BUTTON FRAME
-# ==================================================
+# ==========================================
 
-button_frame = tkinter.Frame(window)
+button_frame = tk.Frame(
+    window
+)
 
 button_frame.pack()
 
 
-# COMPLETE
+# ==========================================
+# COMPLETE BUTTON
+# ==========================================
 
-complete_button = tkinter.Button(
+complete_button = tk.Button(
 
     button_frame,
 
@@ -599,16 +882,23 @@ complete_button = tkinter.Button(
 )
 
 complete_button.grid(
+
     row=0,
+
     column=0,
+
     padx=5,
+
     pady=5
+
 )
 
 
-# EDIT
+# ==========================================
+# EDIT BUTTON
+# ==========================================
 
-edit_button = tkinter.Button(
+edit_button = tk.Button(
 
     button_frame,
 
@@ -621,16 +911,23 @@ edit_button = tkinter.Button(
 )
 
 edit_button.grid(
+
     row=0,
+
     column=1,
+
     padx=5,
+
     pady=5
+
 )
 
 
-# DELETE
+# ==========================================
+# DELETE BUTTON
+# ==========================================
 
-delete_button = tkinter.Button(
+delete_button = tk.Button(
 
     button_frame,
 
@@ -643,16 +940,23 @@ delete_button = tkinter.Button(
 )
 
 delete_button.grid(
+
     row=1,
+
     column=0,
+
     padx=5,
+
     pady=5
+
 )
 
 
-# CLEAR ALL
+# ==========================================
+# CLEAR ALL BUTTON
+# ==========================================
 
-clear_button = tkinter.Button(
+clear_button = tk.Button(
 
     button_frame,
 
@@ -665,39 +969,67 @@ clear_button = tkinter.Button(
 )
 
 clear_button.grid(
+
     row=1,
+
     column=1,
+
     padx=5,
+
     pady=5
+
 )
 
 
-# ==================================================
+# ==========================================
 # PROGRESS
-# ==================================================
+# ==========================================
 
-counter_label = tkinter.Label(
+progress_label = tk.Label(
 
     window,
 
     text="Progress: 0/0 tasks completed",
 
-    font=("Arial", 13, "bold")
+    font=(
+        "Arial",
+        13,
+        "bold"
+    )
 
 )
 
-counter_label.pack(pady=15)
+progress_label.pack(
+    pady=12
+)
 
 
-# ==================================================
-# LOAD EXISTING TASKS
-# ==================================================
+# ==========================================
+# LOAD SAVED DATA
+# ==========================================
 
 load_tasks()
 
 
-# ==================================================
-# START APPLICATION
-# ==================================================
+# ==========================================
+# SHOW TASKS
+# ==========================================
+
+refresh_tasks()
+
+
+# ==========================================
+# SAVE WHEN WINDOW IS CLOSED
+# ==========================================
+
+window.protocol(
+    "WM_DELETE_WINDOW",
+    close_application
+)
+
+
+# ==========================================
+# START PROGRAM
+# ==========================================
 
 window.mainloop()
